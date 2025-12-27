@@ -1,7 +1,5 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import PropTypes from "prop-types";
-import SwipeableViews from "react-swipeable-views";
-import { useTheme } from "@mui/material/styles";
 import AppBar from "@mui/material/AppBar";
 import Tabs from "@mui/material/Tabs";
 import Tab from "@mui/material/Tab";
@@ -14,7 +12,7 @@ import "aos/dist/aos.css";
 import Certificate from "../components/Certificate";
 import { Code, Award, Boxes } from "lucide-react";
 
-const ToggleButton = ({ onClick, isShowingMore }) => (
+const ToggleButton = ({ onClick, isShowingMore, type = 'items' }) => (
   <button
     onClick={onClick}
     className="
@@ -39,7 +37,11 @@ const ToggleButton = ({ onClick, isShowingMore }) => (
       group
       relative
       overflow-hidden
+      focus:outline-none
+      focus:ring-2
+      focus:ring-purple-500/50
     "
+    aria-label={`${isShowingMore ? 'Show less' : 'Show more'} ${type}`}
   >
     <span className="relative z-10 flex items-center gap-2">
       {isShowingMore ? "See Less" : "See More"}
@@ -56,15 +58,23 @@ const ToggleButton = ({ onClick, isShowingMore }) => (
         className={`
           transition-transform 
           duration-300 
+          ${isShowingMore ? "rotate-180" : ""}
           ${isShowingMore ? "group-hover:-translate-y-0.5" : "group-hover:translate-y-0.5"}
         `}
+        aria-hidden="true"
       >
-        <polyline points={isShowingMore ? "18 15 12 9 6 15" : "6 9 12 15 18 9"}></polyline>
+        <polyline points={isShowingMore ? "18 15 12 9 6 15" : "6 9 12 15 18 9"} />
       </svg>
     </span>
-    <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-purple-500/50 transition-all duration-300 group-hover:w-full"></span>
+    <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-purple-500/50 transition-all duration-300 group-hover:w-full" />
   </button>
 );
+
+ToggleButton.propTypes = {
+  onClick: PropTypes.func.isRequired,
+  isShowingMore: PropTypes.bool.isRequired,
+  type: PropTypes.string,
+};
 
 function TabPanel({ children, value, index, ...other }) {
   return (
@@ -73,6 +83,7 @@ function TabPanel({ children, value, index, ...other }) {
       hidden={value !== index}
       id={`full-width-tabpanel-${index}`}
       aria-labelledby={`full-width-tab-${index}`}
+      className="transition-all duration-300"
       {...other}
     >
       {value === index && (
@@ -97,8 +108,8 @@ function a11yProps(index) {
   };
 }
 
-// Локальный массив с проектами
-const localProjects = [
+// Константы
+const LOCAL_PROJECTS = [
   {
     id: 1,
     Img: "/port.png",
@@ -129,18 +140,15 @@ const localProjects = [
   }
 ];
 
-// Локальный массив с сертификатами
-const localCertificates = [
+const LOCAL_CERTIFICATES = [
   {
     id: 1,
     Img: "/certificate.png",
     Title: "Frontend Developer Certificate"
   }
-  
 ];
 
-// techStacks остается без изменений
-const techStacks = [
+const TECH_STACKS = [
   { icon: "html.svg", language: "HTML" },
   { icon: "css.svg", language: "CSS" },
   { icon: "javascript.svg", language: "JavaScript" },
@@ -154,25 +162,67 @@ const techStacks = [
   { icon: "vercel.svg", language: "Vercel" },
 ];
 
-export default function FullWidthTabs() {
-  const theme = useTheme();
+const AOS_ANIMATIONS = {
+  0: { animation: "fade-up-right", duration: "1000" },
+  1: { animation: "fade-up", duration: "1200" },
+  2: { animation: "fade-up-left", duration: "1000" }
+};
+
+export default function PortfolioTabs() {
   const [value, setValue] = useState(0);
   const [showAllProjects, setShowAllProjects] = useState(false);
   const [showAllCertificates, setShowAllCertificates] = useState(false);
-  const isMobile = window.innerWidth < 768;
-  const initialItems = isMobile ? 4 : 6;
+  const [isMobile, setIsMobile] = useState(false);
+  const [touchStart, setTouchStart] = useState(0);
+  const [touchEnd, setTouchEnd] = useState(0);
 
   useEffect(() => {
     AOS.init({
-      once: false,
+      once: true,
+      duration: 800,
+      offset: 100,
     });
-  }, []);
 
-  // Убрали fetchData и useEffect для загрузки с сервера
+    const checkMobile = () => setIsMobile(window.innerWidth < 768);
+    checkMobile();
+    
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   const handleChange = (event, newValue) => {
     setValue(newValue);
   };
+
+  const handleTouchStart = useCallback((e) => {
+    if (!isMobile) return;
+    setTouchStart(e.targetTouches[0].clientX);
+  }, [isMobile]);
+
+  const handleTouchMove = useCallback((e) => {
+    if (!isMobile) return;
+    setTouchEnd(e.targetTouches[0].clientX);
+  }, [isMobile]);
+
+  const handleTouchEnd = useCallback(() => {
+    if (!isMobile || !touchStart || !touchEnd) return;
+    
+    const distance = touchStart - touchEnd;
+    const minSwipeDistance = 50;
+    
+    if (Math.abs(distance) < minSwipeDistance) return;
+    
+    if (distance > 0) {
+      // Свайп влево - следующая вкладка
+      setValue(prev => Math.min(2, prev + 1));
+    } else {
+      // Свайп вправо - предыдущая вкладка
+      setValue(prev => Math.max(0, prev - 1));
+    }
+    
+    setTouchStart(0);
+    setTouchEnd(0);
+  }, [isMobile, touchStart, touchEnd]);
 
   const toggleShowMore = (type) => {
     if (type === 'projects') {
@@ -182,21 +232,31 @@ export default function FullWidthTabs() {
     }
   };
 
-  const displayedProjects = showAllProjects ? localProjects : localProjects.slice(0, initialItems);
-  const displayedCertificates = showAllCertificates ? localCertificates : localCertificates.slice(0, initialItems);
+  const initialItems = isMobile ? 4 : 6;
+  
+  const displayedProjects = showAllProjects ? LOCAL_PROJECTS : LOCAL_PROJECTS.slice(0, initialItems);
+  const displayedCertificates = showAllCertificates ? LOCAL_CERTIFICATES : LOCAL_CERTIFICATES.slice(0, initialItems);
+
+  const getAnimationProps = (index) => {
+    const animationType = AOS_ANIMATIONS[index % 3];
+    return {
+      "data-aos": animationType.animation,
+      "data-aos-duration": animationType.duration
+    };
+  };
 
   return (
-    <div className="md:px-[10%] px-[5%] w-full sm:mt-0 mt-[3rem] bg-[#030014] overflow-hidden" id="Portofolio">
+    <div 
+      className="md:px-[10%] px-[5%] w-full sm:mt-0 mt-[3rem] bg-[#030014] overflow-hidden" 
+      id="portfolio"
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+    >
       {/* Header section */}
-      <div className="text-center pb-10" data-aos="fade-up" data-aos-duration="1000">
-        <h2 className="inline-block text-3xl md:text-5xl font-bold text-center mx-auto text-transparent bg-clip-text bg-gradient-to-r from-[#6366f1] to-[#a855f7]">
-          <span style={{
-            color: '#6366f1',
-            backgroundImage: 'linear-gradient(45deg, #6366f1 10%, #a855f7 93%)',
-            WebkitBackgroundClip: 'text',
-            backgroundClip: 'text',
-            WebkitTextFillColor: 'transparent'
-          }}>
+      <div className="text-center pb-10" data-aos="fade-up" data-aos-duration="800">
+        <h2 className="text-3xl md:text-5xl font-bold text-center mx-auto">
+          <span className="bg-gradient-to-r from-[#6366f1] to-[#a855f7] bg-clip-text text-transparent">
             Portfolio Showcase
           </span>
         </h2>
@@ -204,6 +264,9 @@ export default function FullWidthTabs() {
           Explore my journey through projects, certifications, and technical expertise. 
           Each section represents a milestone in my continuous learning path.
         </p>
+        {isMobile && (
+          <p className="text-slate-500 text-xs mt-2">Swipe left/right to switch tabs</p>
+        )}
       </div>
 
       <Box sx={{ width: "100%" }}>
@@ -240,7 +303,7 @@ export default function FullWidthTabs() {
             sx={{
               minHeight: "70px",
               "& .MuiTab-root": {
-                fontSize: { xs: "0.9rem", md: "1rem" },
+                fontSize: { xs: "0.875rem", md: "1rem" },
                 fontWeight: "600",
                 color: "#94a3b8",
                 textTransform: "none",
@@ -276,98 +339,117 @@ export default function FullWidthTabs() {
           >
             <Tab
               icon={<Code className="mb-2 w-5 h-5 transition-all duration-300" />}
+              iconPosition="start"
               label="Projects"
               {...a11yProps(0)}
             />
             <Tab
               icon={<Award className="mb-2 w-5 h-5 transition-all duration-300" />}
+              iconPosition="start"
               label="Certificates"
               {...a11yProps(1)}
             />
             <Tab
               icon={<Boxes className="mb-2 w-5 h-5 transition-all duration-300" />}
+              iconPosition="start"
               label="Tech Stack"
               {...a11yProps(2)}
             />
           </Tabs>
         </AppBar>
 
-        <SwipeableViews
-          axis={theme.direction === "rtl" ? "x-reverse" : "x"}
-          index={value}
-          onChangeIndex={setValue}
-        >
-          <TabPanel value={value} index={0} dir={theme.direction}>
-            <div className="container mx-auto flex justify-center items-center overflow-hidden">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 2xl:grid-cols-3 gap-5">
-                {displayedProjects.map((project, index) => (
-                  <div
-                    key={project.id || index}
-                    data-aos={index % 3 === 0 ? "fade-up-right" : index % 3 === 1 ? "fade-up" : "fade-up-left"}
-                    data-aos-duration={index % 3 === 0 ? "1000" : index % 3 === 1 ? "1200" : "1000"}
-                  >
-                    <CardProject
-                      Img={project.Img}
-                      Title={project.Title}
-                      Description={project.Description}
-                      Link={project.Link}
-                      id={project.id}
+        {/* Tab Panels */}
+        <div className="relative overflow-hidden">
+          <div 
+            className="flex transition-transform duration-300 ease-in-out"
+            style={{ transform: `translateX(-${value * 100}%)` }}
+          >
+            {/* Projects Tab */}
+            <div className="w-full flex-shrink-0">
+              <TabPanel value={value} index={0}>
+                <div className="container mx-auto flex justify-center items-center overflow-hidden">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 2xl:grid-cols-3 gap-5">
+                    {displayedProjects.map((project, index) => (
+                      <div
+                        key={project.id}
+                        {...getAnimationProps(index)}
+                      >
+                        <CardProject
+                          Img={project.Img}
+                          Title={project.Title}
+                          Description={project.Description}
+                          Link={project.Link}
+                          id={project.id}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                {LOCAL_PROJECTS.length > initialItems && (
+                  <div className="mt-6 w-full flex justify-start">
+                    <ToggleButton
+                      onClick={() => toggleShowMore('projects')}
+                      isShowingMore={showAllProjects}
+                      type="projects"
                     />
                   </div>
-                ))}
-              </div>
+                )}
+              </TabPanel>
             </div>
-            {localProjects.length > initialItems && (
-              <div className="mt-6 w-full flex justify-start">
-                <ToggleButton
-                  onClick={() => toggleShowMore('projects')}
-                  isShowingMore={showAllProjects}
-                />
-              </div>
-            )}
-          </TabPanel>
 
-          <TabPanel value={value} index={1} dir={theme.direction}>
-            <div className="container mx-auto flex justify-center items-center overflow-hidden">
-              <div className="grid grid-cols-1 md:grid-cols-3 md:gap-5 gap-4">
-                {displayedCertificates.map((certificate, index) => (
-                  <div
-                    key={certificate.id || index}
-                    data-aos={index % 3 === 0 ? "fade-up-right" : index % 3 === 1 ? "fade-up" : "fade-up-left"}
-                    data-aos-duration={index % 3 === 0 ? "1000" : index % 3 === 1 ? "1200" : "1000"}
-                  >
-                    <Certificate ImgSertif={certificate.Img} />
+            {/* Certificates Tab */}
+            <div className="w-full flex-shrink-0">
+              <TabPanel value={value} index={1}>
+                <div className="container mx-auto flex justify-center items-center overflow-hidden">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-5">
+                    {displayedCertificates.map((certificate, index) => (
+                      <div
+                        key={certificate.id}
+                        {...getAnimationProps(index)}
+                      >
+                        <Certificate 
+                          ImgSertif={certificate.Img} 
+                          title={certificate.Title}
+                        />
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
+                </div>
+                {LOCAL_CERTIFICATES.length > initialItems && (
+                  <div className="mt-6 w-full flex justify-center md:justify-start">
+                    <ToggleButton
+                      onClick={() => toggleShowMore('certificates')}
+                      isShowingMore={showAllCertificates}
+                      type="certificates"
+                    />
+                  </div>
+                )}
+              </TabPanel>
             </div>
-            {localCertificates.length > initialItems && (
-              <div className="mt-6 w-full flex justify-start">
-                <ToggleButton
-                  onClick={() => toggleShowMore('certificates')}
-                  isShowingMore={showAllCertificates}
-                />
-              </div>
-            )}
-          </TabPanel>
 
-          <TabPanel value={value} index={2} dir={theme.direction}>
-            <div className="container mx-auto flex justify-center items-center overflow-hidden pb-[5%]">
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 lg:gap-8 gap-5">
-                {techStacks.map((stack, index) => (
-                  <div
-                    key={index}
-                    data-aos={index % 3 === 0 ? "fade-up-right" : index % 3 === 1 ? "fade-up" : "fade-up-left"}
-                    data-aos-duration={index % 3 === 0 ? "1000" : index % 3 === 1 ? "1200" : "1000"}
-                  >
-                    <TechStackIcon TechStackIcon={stack.icon} Language={stack.language} />
+            {/* Tech Stack Tab */}
+            <div className="w-full flex-shrink-0">
+              <TabPanel value={value} index={2}>
+                <div className="container mx-auto flex justify-center items-center overflow-hidden pb-[5%]">
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 xl:grid-cols-6 gap-4 md:gap-5 lg:gap-8">
+                    {TECH_STACKS.map((stack, index) => (
+                      <div
+                        key={`${stack.language}-${index}`}
+                        {...getAnimationProps(index)}
+                      >
+                        <TechStackIcon 
+                          TechStackIcon={stack.icon} 
+                          Language={stack.language} 
+                        />
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
+                </div>
+              </TabPanel>
             </div>
-          </TabPanel>
-        </SwipeableViews>
+          </div>
+        </div>
       </Box>
     </div>
   );
-} 
+}

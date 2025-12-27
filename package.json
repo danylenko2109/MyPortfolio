@@ -37,11 +37,13 @@
     "react-dom": "^18.3.1",
     "react-intersection-observer": "^9.13.1",
     "react-router-dom": "^6.28.0",
+    "react-swipeable": "^7.0.2",
     "shadcn-ui": "^0.2.3",
     "spline": "^0.0.0",
     "styled-components": "^6.1.13",
     "sweetalert2": "^11.15.0",
     "tailwind-merge": "^2.5.5",
+    "telegraf": "^4.16.3",
     "typewriter-effect": "^2.21.0"
   },
   "devDependencies": {
